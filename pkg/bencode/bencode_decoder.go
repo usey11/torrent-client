@@ -246,7 +246,7 @@ func (d *BencodeDictDecoder) Decode(in []byte) (interface{}, int, error) {
 
 	s := in
 	if !d.CanDecode(s) {
-		return nil, 0, fmt.Errorf("Cannot decode list from: %s", s)
+		return nil, 0, fmt.Errorf("Cannot decode dict from: %s", s)
 	}
 
 	totalConsumed := 1
