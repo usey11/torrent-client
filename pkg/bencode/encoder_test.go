@@ -75,7 +75,7 @@ func TestDictEncode(t *testing.T) {
 }
 
 func TestDecodeEncode(t *testing.T) {
-	f, err := os.ReadFile("C:\\Users\\usa_m\\Downloads\\Solus-4.4-Budgie.torrent")
+	f, err := os.ReadFile("../../test/Solus-4.4-Budgie.torrent")
 
 	if err != nil {
 		t.Errorf("I can't test without the file")

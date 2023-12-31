@@ -13,7 +13,7 @@ func TestInt32ToIpString(t *testing.T) {
 }
 
 func TestTorrentFileParse(t *testing.T) {
-	fileName := "C:\\Users\\usa_m\\Downloads\\Solus-4.4-Budgie.torrent"
+	fileName := "../../test/Solus-4.4-Budgie.torrent"
 
 	tf, _ := ParseTorrentFile(fileName)
 	expectedPiecesLength := tf.Info.GetNumPieces() * 20

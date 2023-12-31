@@ -2,8 +2,6 @@ package torrent
 
 import (
 	"bytes"
-	"encoding/hex"
-	"fmt"
 	"os"
 	"testing"
 	"tor/pkg/bencode"
@@ -88,27 +86,6 @@ func TestSetupCreateMultiFileTorrentInfo(t *testing.T) {
 	// f.Write(bencodedString)
 	// fmt.Println(string(hex.EncodeToString(uri.InfoHash[:])))
 	// fmt.Println(uri.Trackers)
-}
-
-func TestDebugTest(t *testing.T) {
-	infoFilePath := "C:\\Users\\usa_m\\go\\src\\tor\\pkg\\torrent\\book.torrent"
-	f, err := os.ReadFile(infoFilePath)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	decoded, err := bencode.Decode(f)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	ti := *NewTorrentInfoFromBencodedDict(decoded.(map[string]interface{}))
-	fmt.Println(len(decoded.(map[string]interface{})))
-	ih, err := ti.CalcInfoHash()
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmt.Println(hex.EncodeToString(ih[:]))
 }
 
 func mustLoadInfoFromFile(filename string, t *testing.T) *TorrentInfo {

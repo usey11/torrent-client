@@ -5,66 +5,12 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 	"tor/pkg/util"
 )
-
-func TestValidation(t *testing.T) {
-	filename := "C:\\Users\\usa_m\\go\\src\\tor\\data\\Solus-4.4-Budgie.iso"
-
-	fileName := "C:\\Users\\usa_m\\Downloads\\Solus-4.4-Budgie.torrent"
-	tf, err := ParseTorrentFile(fileName)
-	if err != nil {
-		t.Error(err)
-	}
-
-	f, err := os.Open(filename)
-	if err != nil {
-		t.Error(err)
-	}
-
-	buf := make([]byte, tf.Info.PieceLength)
-
-	n, err := f.Read(buf)
-	piecesChecked := 0
-
-	filePieceHash := sha1.Sum(buf[:n])
-	hash := tf.Info.GetPieceHash(piecesChecked)
-
-	fmt.Println("string(filePieceHash)")
-	fmt.Println(string(filePieceHash[:]))
-	fmt.Println("string(hash)")
-	fmt.Println(string(hash))
-}
-
-type MyUser struct {
-	ID       int64     `json:"id"`
-	Name     string    `json:"name"`
-	LastSeen time.Time `json:"lastSeen"`
-}
-
-func (u *MyUser) MarshalJSON() ([]byte, error) {
-	type Alias MyUser
-	return json.Marshal(&struct {
-		LastSeen int64 `json:"lastSeen"`
-		*Alias
-	}{
-		LastSeen: u.LastSeen.Unix(),
-		Alias:    (*Alias)(u),
-	})
-}
-
-func TestTest(t *testing.T) {
-	_ = json.NewEncoder(os.Stdout).Encode(
-		&MyUser{1, "Ken", time.Now()},
-	)
-}
 
 func TestGotAllPieces(t *testing.T) {
 	numPieces := 13
