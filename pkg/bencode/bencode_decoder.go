@@ -5,66 +5,28 @@ import (
 	"strconv"
 )
 
-var defaultDecoder *BencodeDecoder
-
-func init() {
-	defaultDecoder = NewBencodeDecoder()
-}
-
 func Decode(s []byte) (interface{}, error) {
-	return defaultDecoder.Decode(s)
+	rv, _, err := DecodeWithCount(s)
+	return rv, err
 }
 
 func DecodeWithCount(s []byte) (interface{}, int, error) {
-	return defaultDecoder.DecodeWithCount(s)
-}
-
-type BencodeDecoder struct {
-	decoders []BencodeTypeDecoder
-}
-
-func NewBencodeDecoder() *BencodeDecoder {
-	rv := BencodeDecoder{
-		decoders: []BencodeTypeDecoder{&BencodeIntegerDecoder{}, &BencodeByteDecoder{}},
+	if len(s) < 1 {
+		return nil, 0, fmt.Errorf("input byte array is empty")
 	}
 
-	listDecoder := NewListDecoder()
-
-	dictDecoder := NewDictDecoder()
-
-	rv.decoders = append(rv.decoders, listDecoder, dictDecoder)
-	return &rv
-}
-
-func (d *BencodeDecoder) CanDecode(s []byte) bool {
-	for _, decoder := range d.decoders {
-		if decoder.CanDecode(s) {
-			return true
-		}
+	switch firstChar := s[0]; {
+	case firstChar == 'i':
+		return decodeInteger(s)
+	case firstChar >= '0' && firstChar <= '9':
+		return decodeByteString(s)
+	case firstChar == 'd':
+		return decodeDict(s)
+	case firstChar == 'l':
+		return decodeList(s)
 	}
 
-	return false
-}
-
-func (d *BencodeDecoder) Decode(s []byte) (interface{}, error) {
-	for _, decoder := range d.decoders {
-		if decoder.CanDecode(s) {
-			result, _, err := decoder.Decode(s)
-			return result, err
-		}
-	}
-
-	return nil, fmt.Errorf("BencodeDecoder couldn't find a decoder to decode: %s", s)
-}
-
-func (d *BencodeDecoder) DecodeWithCount(s []byte) (interface{}, int, error) {
-	for _, decoder := range d.decoders {
-		if decoder.CanDecode(s) {
-			return decoder.Decode(s)
-		}
-	}
-
-	return nil, 0, fmt.Errorf("BencodeDecoder couldn't find a decoder to decode: %s", s)
+	return nil, 0, fmt.Errorf("couldn't decode due to invalid starting character (must be i, d, l or a number): %s", s)
 }
 
 func findFirstByte(s []byte, b byte) (int, bool) {
@@ -88,10 +50,9 @@ func (d *BencodeIntegerDecoder) CanDecode(s []byte) bool {
 	return s[0] == 'i'
 }
 
-func (d *BencodeIntegerDecoder) Decode(s []byte) (interface{}, int, error) {
-
-	if !d.CanDecode(s) {
-		return nil, 0, fmt.Errorf("Cannot decode: %s", s)
+func decodeInteger(s []byte) (int, int, error) {
+	if s[0] != 'i' {
+		return 0, 0, fmt.Errorf("expected string to start with 'i': %s", s)
 	}
 
 	end := 0
@@ -103,31 +64,19 @@ func (d *BencodeIntegerDecoder) Decode(s []byte) (interface{}, int, error) {
 	}
 
 	if end == 0 {
-		return nil, 0, fmt.Errorf("No end character found in s: %v", s)
+		return 0, 0, fmt.Errorf("no end character found in s: %v", s)
 	}
 
 	val, err := strconv.Atoi(string(s[1:end]))
 
 	if err != nil {
-		return nil, 0, err
+		return 0, 0, err
 	}
 
 	return val, end + 1, nil
 }
 
-type BencodeByteDecoder struct {
-}
-
-func (d *BencodeByteDecoder) CanDecode(s []byte) bool {
-	return s[0] >= '0' && s[0] <= '9'
-}
-
-func (d *BencodeByteDecoder) Decode(s []byte) (interface{}, int, error) {
-
-	if !d.CanDecode(s) {
-		return nil, 0, fmt.Errorf("Cannot decode: %s", s)
-	}
-
+func decodeByteString(s []byte) ([]byte, int, error) {
 	delimPos, ok := findFirstByte(s, ':')
 
 	if !ok {
@@ -150,60 +99,35 @@ func (d *BencodeByteDecoder) Decode(s []byte) (interface{}, int, error) {
 	return byteString, delimPos + 1 + l, nil
 }
 
-func NewListDecoder() *BencodeListDecoder {
-	rv := BencodeListDecoder{
-		decoders: []BencodeTypeDecoder{&BencodeIntegerDecoder{}, &BencodeByteDecoder{}},
-	}
-
-	dictDecoder := BencodeDictDecoder{
-		decoders: []BencodeTypeDecoder{&BencodeIntegerDecoder{}, &BencodeByteDecoder{}},
-	}
-
-	dictDecoder.decoders = append(rv.decoders, &dictDecoder)
-	dictDecoder.decoders = append(dictDecoder.decoders, &rv)
-	rv.decoders = append(rv.decoders, &rv)
-	rv.decoders = append(rv.decoders, &dictDecoder)
-	return &rv
-}
-
-type BencodeListDecoder struct {
-	decoders []BencodeTypeDecoder
-}
-
-func (d *BencodeListDecoder) CanDecode(s []byte) bool {
-	return s[0] == 'l'
-}
-
-func (d *BencodeListDecoder) Decode(in []byte) (interface{}, int, error) {
-
+func decodeDict(in []byte) (map[string]interface{}, int, error) {
 	s := in
-	if !d.CanDecode(s) {
-		return nil, 0, fmt.Errorf("Cannot decode list from: %s", s)
+	if s[0] != 'd' {
+		return nil, 0, fmt.Errorf("expected strint to start with 'd': %s", s)
 	}
 
 	totalConsumed := 1
 	s = s[1:]
-	var rv []interface{}
+	rv := make(map[string]interface{})
+
 	for {
-		decoded := false
-		for _, decoder := range d.decoders {
-			if decoder.CanDecode(s) {
-				val, consumed, err := decoder.Decode(s)
-				if err != nil {
-					return nil, 0, err
-				}
-
-				rv = append(rv, val)
-				totalConsumed += consumed
-				s = s[consumed:]
-				decoded = true
-				break
-			}
+		key, consumed, err := decodeByteString(s)
+		if err != nil {
+			return nil, 0, fmt.Errorf("error decoding key: %s error: %w", s, err)
 		}
 
-		if !decoded {
-			return nil, 0, fmt.Errorf("BencodeListDecoder couldn't find a decoder for: '%s'", s)
+		totalConsumed += consumed
+		s = s[consumed:]
+
+		var val interface{}
+		val, consumed, err = DecodeWithCount(s)
+		if err != nil {
+			return nil, 0, err
 		}
+
+		totalConsumed += consumed
+		s = s[consumed:]
+
+		rv[string(key)] = val
 
 		// We done
 		if s[0] == 'e' {
@@ -215,78 +139,25 @@ func (d *BencodeListDecoder) Decode(in []byte) (interface{}, int, error) {
 	return rv, totalConsumed, nil
 }
 
-func NewDictDecoder() *BencodeDictDecoder {
-	rv := BencodeDictDecoder{
-		decoders: []BencodeTypeDecoder{&BencodeIntegerDecoder{}, &BencodeByteDecoder{}},
-	}
-	rv.stringDecoder = BencodeByteDecoder{}
-
-	listDecoder := BencodeListDecoder{
-		decoders: []BencodeTypeDecoder{&BencodeIntegerDecoder{}, &BencodeByteDecoder{}},
-	}
-
-	listDecoder.decoders = append(rv.decoders, &listDecoder)
-	listDecoder.decoders = append(listDecoder.decoders, &rv)
-
-	rv.decoders = append(rv.decoders, &rv)
-	rv.decoders = append(rv.decoders, &listDecoder)
-	return &rv
-}
-
-type BencodeDictDecoder struct {
-	decoders      []BencodeTypeDecoder
-	stringDecoder BencodeByteDecoder
-}
-
-func (d *BencodeDictDecoder) CanDecode(s []byte) bool {
-	return s[0] == 'd'
-}
-
-func (d *BencodeDictDecoder) Decode(in []byte) (interface{}, int, error) {
-
+func decodeList(in []byte) ([]interface{}, int, error) {
 	s := in
-	if !d.CanDecode(s) {
-		return nil, 0, fmt.Errorf("Cannot decode dict from: %s", s)
+	if s[0] != 'l' {
+		return nil, 0, fmt.Errorf("expecte string to start with 'l': %s", s)
 	}
 
 	totalConsumed := 1
 	s = s[1:]
-	rv := make(map[string]interface{})
-
+	var rv []interface{}
 	for {
-		if !d.stringDecoder.CanDecode(s) {
-			return nil, 0, fmt.Errorf("keys must be byte array: %s", s)
-		}
-
-		key, consumed, err := d.stringDecoder.Decode(s)
+		val, consumed, err := DecodeWithCount(s)
 		if err != nil {
-			return nil, 0, fmt.Errorf("error decoding key: %s error: %w", s, err)
+			return nil, 0, err
 		}
 
+		rv = append(rv, val)
 		totalConsumed += consumed
 		s = s[consumed:]
 
-		var val interface{}
-		for _, decoder := range d.decoders {
-			if decoder.CanDecode(s) {
-				val, consumed, err = decoder.Decode(s)
-				if err != nil {
-					return nil, 0, err
-				}
-
-				totalConsumed += consumed
-				s = s[consumed:]
-				break
-			}
-		}
-
-		if val == nil {
-			return nil, 0, fmt.Errorf("BencodeDictDecoder couldn't find a decoder for: '%s'", s)
-		}
-
-		rv[string(key.([]byte))] = val
-
-		// We done
 		if s[0] == 'e' {
 			totalConsumed += 1
 			break

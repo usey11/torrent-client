@@ -19,15 +19,8 @@ func TestIntDecode(t *testing.T) {
 		consumedExpected := expecteds[0]
 		expected := expecteds[1]
 		input := []byte(i)
-		d := BencodeIntegerDecoder{}
 
-		c := d.CanDecode(input)
-
-		if c == false {
-			t.Errorf("Should be able to decode: %s", input)
-		}
-
-		v, consumed, err := d.Decode(input)
+		val, consumed, err := decodeInteger(input)
 		if err != nil {
 			t.Errorf("Should be able to decode: %s", input)
 		}
@@ -36,12 +29,9 @@ func TestIntDecode(t *testing.T) {
 			t.Errorf("Consumption difference %v vs %v: %s", consumed, consumedExpected, i)
 		}
 
-		if val, ok := v.(int); !ok {
-			t.Errorf("Should be able int: %s", input)
-		} else if val != expected {
+		if val != expected {
 			t.Errorf("Value should be %v from input: %s", expected, input)
 		}
-
 	}
 }
 
@@ -54,15 +44,7 @@ var cantIntDecodes = []string{
 func TestIntDecodeCant(t *testing.T) {
 	for _, i := range cantIntDecodes {
 		input := []byte(i)
-		d := BencodeIntegerDecoder{}
-
-		c := d.CanDecode(input)
-
-		if c == true {
-			t.Errorf("Shouldn't be able to decode: %s", input)
-		}
-
-		_, _, err := d.Decode(input)
+		_, _, err := decodeInteger(input)
 		if err == nil {
 			t.Errorf("Should be error trying to decode: %s", input)
 		}
@@ -78,12 +60,10 @@ var invalidIntDecodes = []string{
 }
 
 func TestIntDecodeInvalid(t *testing.T) {
-
 	for _, i := range invalidIntDecodes {
 		input := []byte(i)
-		d := BencodeIntegerDecoder{}
 
-		_, _, err := d.Decode(input)
+		_, _, err := decodeInteger(input)
 		if err == nil {
 			t.Errorf("Should be error trying to decode: %s", input)
 		}
@@ -103,22 +83,13 @@ func TestByteStringDecode(t *testing.T) {
 
 		fmt.Printf("Value: %s", string(input))
 		fmt.Println()
-		d := BencodeByteDecoder{}
 
-		c := d.CanDecode(input)
-
-		if c == false {
-			t.Errorf("Should be able to decode: %s", input)
-		}
-
-		v, _, err := d.Decode(input)
+		val, _, err := decodeByteString(input)
 		if err != nil {
 			t.Errorf("Should be able to decode: %s", input)
 		}
 
-		if val, ok := v.([]byte); !ok {
-			t.Errorf("Should be byte array: %s", input)
-		} else if !bytes.Equal(val, []byte(expected)) {
+		if !bytes.Equal(val, []byte(expected)) {
 			t.Errorf("Value should be %v from input: %s", string(expected), string(input))
 		}
 	}
@@ -132,21 +103,10 @@ var validListDecodes = map[string][]interface{}{
 
 func TestListDecode(t *testing.T) {
 	for i, e := range validListDecodes {
-		d := NewListDecoder()
-		if !d.CanDecode([]byte(i)) {
-			t.Errorf("Should be able to decode :%s", i)
-		}
-
-		v, _, err := d.Decode([]byte(i))
+		val, _, err := decodeList([]byte(i))
 
 		if err != nil {
 			t.Errorf("Shouldn't have error: %v decoding: %s", err, i)
-		}
-
-		val, ok := v.([]interface{})
-
-		if !ok {
-			t.Errorf("What is the return type hmmm? :%s", i)
 		}
 
 		if !reflect.DeepEqual(e, val) {
@@ -161,21 +121,11 @@ var validDictDecodes = map[string]map[string]interface{}{
 
 func TestDictDecode(t *testing.T) {
 	for i, e := range validDictDecodes {
-		d := NewDictDecoder()
-		if !d.CanDecode([]byte(i)) {
-			t.Errorf("Should be able to decode :%s", i)
-		}
 
-		v, _, err := d.Decode([]byte(i))
+		val, _, err := decodeDict([]byte(i))
 
 		if err != nil {
 			t.Errorf("Shouldn't have error: %v decoding: %s", err, i)
-		}
-
-		val, ok := v.(map[string]interface{})
-
-		if !ok {
-			t.Errorf("What is the return type hmmm? :%s", i)
 		}
 
 		if !reflect.DeepEqual(e, val) {
