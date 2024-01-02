@@ -38,18 +38,6 @@ func findFirstByte(s []byte, b byte) (int, bool) {
 	return -1, false
 }
 
-type BencodeTypeDecoder interface {
-	Decode([]byte) (interface{}, int, error)
-	CanDecode([]byte) bool
-}
-
-type BencodeIntegerDecoder struct {
-}
-
-func (d *BencodeIntegerDecoder) CanDecode(s []byte) bool {
-	return s[0] == 'i'
-}
-
 func decodeInteger(s []byte) (int, int, error) {
 	if s[0] != 'i' {
 		return 0, 0, fmt.Errorf("expected string to start with 'i': %s", s)
